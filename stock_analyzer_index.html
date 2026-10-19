@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>US Stock Portfolio Analyzer</title>
+<meta name="description" content="Personal US stock portfolio tracker and rule-based trade planning tool">
+<style>
+:root{color-scheme:dark;--bg:#0a1020;--panel:#121b2d;--panel2:#0d1627;--line:#263650;--text:#edf3ff;--muted:#9aacc8;--blue:#6681ff;--green:#42d6a0;--red:#ff7187;--yellow:#ffcb70}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#0a1020,#0c1425 60%,#101a30);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+header{padding:22px clamp(16px,4vw,42px);border-bottom:1px solid var(--line);background:#0b1324dd;position:sticky;top:0;z-index:5;backdrop-filter:blur(12px)}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}.brand{font-size:1.15rem;font-weight:800;letter-spacing:.2px}.sub{color:var(--muted);font-size:.84rem}
+main{padding:24px clamp(14px,3vw,36px) 48px;max-width:1800px;margin:auto}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.metric,.panel{background:linear-gradient(155deg,var(--panel),#10192a);border:1px solid var(--line);border-radius:17px;box-shadow:0 10px 28px #0002}
+.metric{padding:18px}.metric .label{color:var(--muted);font-size:.84rem}.metric .value{font-size:1.55rem;font-weight:800;margin-top:8px;overflow-wrap:anywhere}
+.layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(300px,1fr);gap:16px;margin-top:18px}.panel{padding:20px;min-width:0}.panel h2{font-size:1.08rem;margin:0 0 4px}.hint{color:var(--muted);font-size:.84rem;margin-bottom:16px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}label{font-size:.82rem;color:var(--muted)}
+input,select,textarea{width:100%;border:1px solid #354663;background:var(--panel2);color:var(--text);padding:10px 11px;border-radius:9px;font:inherit;min-width:0}input:focus,select:focus,textarea:focus{outline:2px solid #6681ff77;border-color:var(--blue)}
+button,.button{border:1px solid transparent;border-radius:9px;padding:10px 13px;font:inherit;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.primary{background:var(--blue);color:white}.secondary{background:#1c2a43;border-color:#354663;color:var(--text)}.danger{background:#351b2b;border-color:#713047;color:#ffb7c3}.smallbtn{padding:6px 9px;font-size:.8rem}
+.tablewrap{overflow:auto;width:100%;border:1px solid var(--line);border-radius:12px}table{width:100%;border-collapse:collapse;min-width:920px;font-size:.87rem}th,td{padding:11px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}th{color:var(--muted);font-weight:600;background:#0d1627;position:sticky;top:0}tr:last-child td{border-bottom:0}.ticker{font-weight:800}.muted{color:var(--muted)}.positive{color:var(--green)}.negative{color:var(--red)}
+.badge{display:inline-block;border-radius:999px;padding:4px 8px;font-size:.75rem;font-weight:700;background:#26344d;color:#dce7ff}.badge.green{background:#123c36;color:#7bf0c4}.badge.red{background:#482334;color:#ff9eb0}.badge.yellow{background:#473820;color:#ffda94}.badge.blue{background:#1c315e;color:#b8caff}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.mini{padding:13px;background:var(--panel2);border:1px solid var(--line);border-radius:12px}.mini strong{display:block;font-size:1.05rem;margin-top:4px}.notice{border:1px solid #594b2b;background:#2a2418;color:#ffdfa0;border-radius:12px;padding:12px 14px;font-size:.85rem;margin-bottom:16px}
+.empty{text-align:center;padding:32px;color:var(--muted)}.actions{display:flex;gap:7px}.sectiongap{margin-top:18px}.footer{margin-top:20px;color:var(--muted);font-size:.8rem}
+@media(max-width:1050px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:1fr}}
+@media(max-width:540px){.grid{grid-template-columns:1fr 1fr;gap:8px}.metric{padding:13px}.metric .value{font-size:1.12rem}.panel{padding:14px}.formgrid,.cards{grid-template-columns:1fr}.field.full{grid-column:auto}.brand{font-size:1rem}header{position:static}}
+</style>
+</head>
+<body>
+<header><div class="top"><div><div class="brand">◈ US Stock Portfolio Analyzer</div><div class="sub">Local-first · US equities · Short-term + long-term planning</div></div><div class="row"><button id="exportBtn" class="secondary">Export JSON</button><button id="importBtn" class="secondary">Import JSON</button><input id="importFile" type="file" accept=".json,application/json" hidden></div></div></header>
+<main>
+<div class="notice"><strong>Prototype notice:</strong> This version saves data in this browser using localStorage. Prices and indicators are entered manually. It does not connect to a broker, fetch live quotes, or send orders. Export backups regularly.</div>
+<section class="grid">
+<div class="metric"><div class="label">Portfolio market value</div><div class="value" id="totalValue">$0.00</div></div>
+<div class="metric"><div class="label">Cost basis</div><div class="value" id="totalCost">$0.00</div></div>
+<div class="metric"><div class="label">Unrealized P/L</div><div class="value" id="totalPL">$0.00</div><div class="sub" id="totalReturn">0.00%</div></div>
+<div class="metric"><div class="label">Holdings</div><div class="value" id="holdingCount">0</div><div class="sub" id="strategyMix">Short $0 · Long $0</div></div>
+</section>
+<div class="layout">
+<div>
+<section class="panel">
+<div class="row"><div><h2>My holdings</h2><div class="hint">Track cost basis, allocation, and rule-based signals.</div></div><input id="search" placeholder="Filter ticker…" style="max-width:190px"></div>
+<div class="tablewrap"><table><thead><tr><th>Ticker</th><th>Strategy</th><th>Qty</th><th>Avg cost</th><th>Price</th><th>Market value</th><th>Unrealized P/L</th><th>Signal</th><th>Actions</th></tr></thead><tbody id="holdingsBody"></tbody></table><div id="emptyState" class="empty">No holdings yet. Add your first stock using the form.</div></div>
+<div class="footer">Signal rules are screening aids only, not forecasts. Data freshness depends on your manual inputs.</div>
+</section>
+<section class="panel sectiongap">
+<h2>Trade plan calculator</h2><div class="hint">Calculate risk per share, position size, and reward/risk using your own entry, stop and target.</div>
+<div class="formgrid">
+<div class="field"><label for="planEntry">Planned entry ($)</label><input id="planEntry" type="number" min="0" step="any" value="100"></div>
+<div class="field"><label for="planStop">Stop price ($)</label><input id="planStop" type="number" min="0" step="any" value="95"></div>
+<div class="field"><label for="planTarget">Target price ($)</label><input id="planTarget" type="number" min="0" step="any" value="110"></div>
+<div class="field"><label for="riskBudget">Max risk budget ($)</label><input id="riskBudget" type="number" min="0" step="any" value="50"></div>
+</div>
+<div class="cards sectiongap"><div class="mini"><span class="muted">Risk per share</span><strong id="riskPerShare">$5.00</strong></div><div class="mini"><span class="muted">Suggested max quantity</span><strong id="planQty">10</strong></div><div class="mini"><span class="muted">Position cost</span><strong id="planCost">$1,000.00</strong></div><div class="mini"><span class="muted">Reward / risk</span><strong id="rewardRisk">2.00R</strong></div></div>
+<div id="planError" class="muted sectiongap"></div>
+</section>
+</div>
+<aside>
+<section class="panel">
+<div class="row"><div><h2 id="formTitle">Add / update holding</h2><div class="hint">All monetary values in USD.</div></div></div>
+<form id="holdingForm">
+<input type="hidden" id="holdingId">
+<div class="formgrid">
+<div class="field"><label for="ticker">Ticker *</label><input id="ticker" maxlength="15" required placeholder="AAPL" pattern="[A-Za-z0-9.\\-]+"></div>
+<div class="field"><label for="company">Company name</label><input id="company" placeholder="Apple Inc."></div>
+<div class="field"><label for="strategy">Strategy</label><select id="strategy"><option value="long">Long-term</option><option value="short">Short-term / swing</option></select></div>
+<div class="field"><label for="quantity">Quantity</label><input id="quantity" type="number" min="0" step="any" value="0"></div>
+<div class="field"><label for="avgCost">Average cost ($)</label><input id="avgCost" type="number" min="0" step="any" value="0"></div>
+<div class="field"><label for="price">Latest price ($)</label><input id="price" type="number" min="0" step="any" value="0"></div>
+<div class="field"><label for="ema20">EMA 20</label><input id="ema20" type="number" min="0" step="any" placeholder="Optional"></div>
+<div class="field"><label for="ema50">EMA 50</label><input id="ema50" type="number" min="0" step="any" placeholder="Optional"></div>
+<div class="field"><label for="rsi">RSI 14 (0–100)</label><input id="rsi" type="number" min="0" max="100" step="any" placeholder="Optional"></div>
+<div class="field"><label for="support">Support ($)</label><input id="support" type="number" min="0" step="any" placeholder="Optional"></div>
+<div class="field"><label for="resistance">Resistance ($)</label><input id="resistance" type="number" min="0" step="any" placeholder="Optional"></div>
+<div class="field full"><label for="notes">Investment thesis / notes</label><textarea id="notes" rows="3" placeholder="Why do I own it? What would change my mind?"></textarea></div>
+<div class="field full"><button class="primary" type="submit">Save holding</button><button class="secondary" id="cancelEdit" type="button" hidden>Cancel edit</button></div>
+</div></form>
+</section>
+<section class="panel sectiongap">
+<h2>How to read signals</h2><div class="hint">Basic rules, not automatic instructions.</div>
+<div class="mini"><span class="badge green">Positive trend</span><p class="muted">Price above EMA20 and EMA20 above EMA50. For long-term holdings, also check valuation and business fundamentals.</p></div>
+<div class="mini sectiongap"><span class="badge yellow">Overbought watch</span><p class="muted">RSI 14 ≥ 70. This is not automatically a sell signal; strong trends can remain overbought.</p></div>
+<div class="mini sectiongap"><span class="badge blue">Near support</span><p class="muted">Price near the entered support level. Support can fail; wait for confirmation and define risk.</p></div>
+<div class="mini sectiongap"><span class="badge red">Review thesis</span><p class="muted">Price below EMA50 for a long-term position. Reassess the investment case rather than selling mechanically.</p></div>
+</section>
+<section class="panel sectiongap"><h2>Data & privacy</h2><p class="muted">No account or API key is required. Data stays in this browser profile unless you export it. Clearing site data or changing browsers/devices may remove access to saved data. Do not enter broker passwords or API secrets.</p></section>
+</aside>
+</div>
+<div class="footer">For personal tracking and education only. No investment outcome is guaranteed. Consider fees, taxes, FX conversion and slippage.</div>
+</main>
+<script>
+(() => {
+'use strict';
+const STORAGE_KEY = 'usStockPortfolioAnalyzer.v1';
+let holdings = [];
+let nextId = 1;
+const $ = id => document.getElementById(id);
+const num = value => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+const optionalNum = id => $(id).value.trim() === '' ? null : num($(id).value);
+const usd = value => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(value || 0);
+const pct = value => `${value.toFixed(2)}%`;
+const safe = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function saveStorage() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({version:1,nextId,holdings})); }
+  catch (e) { alert('Could not save data in this browser. Export a backup and check browser storage settings.'); }
+}
+function loadStorage() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    if (parsed && Array.isArray(parsed.holdings)) {
+      holdings = parsed.holdings;
+      nextId = Math.max(Number(parsed.nextId)||1, ...holdings.map(h => Number(h.id)+1), 1);
+    }
+  } catch (e) { holdings = []; nextId = 1; }
+}
+function signal(h) {
+  const p = num(h.price);
+  if (p <= 0) return ['Add price data',''];
+  if (h.strategy === 'short') {
+    if (h.rsi !== null && num(h.rsi) >= 70) return ['Overbought watch','yellow'];
+    if (h.ema20 !== null && h.ema50 !== null && p > num(h.ema20) && num(h.ema20) > num(h.ema50)) return ['Positive trend','green'];
+    if (h.support !== null && p <= num(h.support)*1.02) return ['Near support','blue'];
+    return ['Wait / review',''];
+  }
+  if (h.ema50 !== null && p < num(h.ema50)) return ['Review thesis','red'];
+  if (h.support !== null && p <= num(h.support)*1.03) return ['Near support','blue'];
+  if (h.ema20 !== null && h.ema50 !== null && p > num(h.ema20) && num(h.ema20) > num(h.ema50)) return ['Positive trend','green'];
+  return ['Hold / review',''];
+}
+function render() {
+  const totalValue = holdings.reduce((s,h)=>s+num(h.quantity)*num(h.price),0);
+  const totalCost = holdings.reduce((s,h)=>s+num(h.quantity)*num(h.avgCost),0);
+  const pl = totalValue-totalCost;
+  const shortValue = holdings.filter(h=>h.strategy==='short').reduce((s,h)=>s+num(h.quantity)*num(h.price),0);
+  const longValue = totalValue-shortValue;
+  $('totalValue').textContent=usd(totalValue); $('totalCost').textContent=usd(totalCost);
+  $('totalPL').textContent=usd(pl); $('totalPL').className='value '+(pl>=0?'positive':'negative');
+  $('totalReturn').textContent=pct(totalCost>0?pl/totalCost*100:0);
+  $('totalReturn').className='sub '+(pl>=0?'positive':'negative');
+  $('holdingCount').textContent=String(holdings.length);
+  $('strategyMix').textContent=`Short ${usd(shortValue)} · Long ${usd(longValue)}`;
+  const query=$('search').value.trim().toUpperCase();
+  const visible=holdings.filter(h=>h.ticker.includes(query));
+  $('emptyState').style.display=visible.length?'none':'block';
+  $('holdingsBody').innerHTML=visible.map(h=>{
+    const value=num(h.quantity)*num(h.price), cost=num(h.quantity)*num(h.avgCost), gain=value-cost;
+    const s=signal(h), strategy=h.strategy==='short'?'Short-term':'Long-term';
+    return `<tr>
+      <td><div class="ticker">${safe(h.ticker)}</div><div class="muted">${safe(h.company)}</div></td>
+      <td><span class="badge ${h.strategy==='short'?'blue':''}">${strategy}</span></td>
+      <td>${num(h.quantity).toLocaleString('en-US',{maximumFractionDigits:6})}</td>
+      <td>${usd(num(h.avgCost))}</td><td>${usd(num(h.price))}</td><td>${usd(value)}</td>
+      <td class="${gain>=0?'positive':'negative'}">${usd(gain)}<div class="muted">${pct(cost>0?gain/cost*100:0)}</div></td>
+      <td><span class="badge ${s[1]}">${safe(s[0])}</span></td>
+      <td><div class="actions"><button class="secondary smallbtn" data-edit="${h.id}">Edit</button><button class="danger smallbtn" data-delete="${h.id}">Delete</button></div></td>
+    </tr>`;
+  }).join('');
+  saveStorage();
+}
+function clearForm() {
+  $('holdingForm').reset(); $('holdingId').value=''; $('quantity').value='0'; $('avgCost').value='0'; $('price').value='0';
+  $('formTitle').textContent='Add / update holding'; $('cancelEdit').hidden=true;
+}
+$('holdingForm').addEventListener('submit', e=>{
+  e.preventDefault();
+  const ticker=$('ticker').value.trim().toUpperCase();
+  if(!/^[A-Z0-9.-]{1,15}$/.test(ticker)){alert('Please enter a valid ticker symbol.');return;}
+  const id=$('holdingId').value?Number($('holdingId').value):null;
+  const duplicate=holdings.find(h=>h.ticker===ticker && h.id!==id);
+  if(duplicate){alert('This ticker already exists. Use Edit to update it.');return;}
+  const h={id:id||nextId++,ticker,company:$('company').value.trim(),strategy:$('strategy').value,
+    quantity:num($('quantity').value),avgCost:num($('avgCost').value),price:num($('price').value),
+    ema20:optionalNum('ema20'),ema50:optionalNum('ema50'),rsi:optionalNum('rsi'),
+    support:optionalNum('support'),resistance:optionalNum('resistance'),notes:$('notes').value.trim()};
+  if(id){const index=holdings.findIndex(x=>x.id===id);if(index>=0)holdings[index]=h;else holdings.push(h);}else holdings.push(h);
+  clearForm();render();
+});
+$('holdingsBody').addEventListener('click', e=>{
+  const edit=e.target.closest('[data-edit]'), del=e.target.closest('[data-delete]');
+  if(edit){
+    const h=holdings.find(x=>x.id===Number(edit.dataset.edit));if(!h)return;
+    $('holdingId').value=h.id;$('ticker').value=h.ticker;$('company').value=h.company||'';$('strategy').value=h.strategy;
+    $('quantity').value=h.quantity;$('avgCost').value=h.avgCost;$('price').value=h.price;
+    $('ema20').value=h.ema20??'';$('ema50').value=h.ema50??'';$('rsi').value=h.rsi??'';
+    $('support').value=h.support??'';$('resistance').value=h.resistance??'';$('notes').value=h.notes||'';
+    $('formTitle').textContent='Edit holding';$('cancelEdit').hidden=false;window.scrollTo({top:0,behavior:'smooth'});
+  }
+  if(del){const h=holdings.find(x=>x.id===Number(del.dataset.delete));if(h&&confirm(`Delete ${h.ticker}?`)){holdings=holdings.filter(x=>x.id!==h.id);render();}}
+});
+$('cancelEdit').addEventListener('click',clearForm);
+$('search').addEventListener('input',render);
+function calcPlan(){
+  const entry=num($('planEntry').value),stop=num($('planStop').value),target=num($('planTarget').value),budget=num($('riskBudget').value);
+  const valid=entry>0&&stop>=0&&stop<entry&&target>entry&&budget>=0;
+  if(!valid){$('riskPerShare').textContent='—';$('planQty').textContent='—';$('planCost').textContent='—';$('rewardRisk').textContent='—';$('planError').textContent='Check: entry must be above stop; target must be above entry; risk budget must be non-negative.';return;}
+  const risk=entry-stop, qty=Math.floor((budget/risk)*1000000)/1000000, cost=qty*entry, rr=(target-entry)/risk;
+  $('riskPerShare').textContent=usd(risk);$('planQty').textContent=qty.toLocaleString('en-US',{maximumFractionDigits:6});
+  $('planCost').textContent=usd(cost);$('rewardRisk').textContent=rr.toFixed(2)+'R';
+  $('planError').textContent='Illustrative only. Position size excludes fees, slippage, FX and gap risk; ensure the total position fits your portfolio.';
+}
+['planEntry','planStop','planTarget','riskBudget'].forEach(id=>$(id).addEventListener('input',calcPlan));
+$('exportBtn').addEventListener('click',()=>{
+  const blob=new Blob([JSON.stringify({version:1,exportedAt:new Date().toISOString(),holdings},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='us-stock-portfolio-backup.json';a.click();URL.revokeObjectURL(a.href);
+});
+$('importBtn').addEventListener('click',()=>$('importFile').click());
+$('importFile').addEventListener('change',async e=>{
+  const file=e.target.files[0];if(!file)return;
+  try{
+    const data=JSON.parse(await file.text());const incoming=Array.isArray(data)?data:data.holdings;
+    if(!Array.isArray(incoming))throw new Error('JSON must contain a holdings array.');
+    if(!confirm(`Import ${incoming.length} holdings? This replaces the current holdings.`))return;
+    const seen=new Set();
+    holdings=incoming.map((h,i)=>{
+      const ticker=String(h.ticker||'').toUpperCase().trim();
+      if(!/^[A-Z0-9.-]{1,15}$/.test(ticker)||seen.has(ticker))throw new Error('Invalid or duplicate ticker in file.');
+      seen.add(ticker);
+      return {id:i+1,ticker,company:String(h.company||''),strategy:h.strategy==='short'?'short':'long',
+        quantity:Math.max(0,num(h.quantity)),avgCost:Math.max(0,num(h.avgCost??h.avg_cost)),price:Math.max(0,num(h.price??h.current_price)),
+        ema20:h.ema20==null||h.ema20===''?null:num(h.ema20),ema50:h.ema50==null||h.ema50===''?null:num(h.ema50),
+        rsi:h.rsi==null||h.rsi===''?null:num(h.rsi),support:h.support==null||h.support===''?null:num(h.support),
+        resistance:h.resistance==null||h.resistance===''?null:num(h.resistance),notes:String(h.notes||'')};
+    });
+    nextId=holdings.length+1;render();alert('Import completed.');
+  }catch(err){alert('Import failed: '+err.message);}finally{e.target.value='';}
+});
+loadStorage();render();calcPlan();
+})();
+</script>
+</body>
+</html>
